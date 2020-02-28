@@ -1,10 +1,5 @@
-from app import app, es_con, dataset_generator
+from app import app, product_cnt, generate_cnt, data_cnt
 from flask import jsonify, request, send_file, abort
-from urllib.request import urlopen
-from bs4 import BeautifulSoup
-import sys
-import zipfile
-import io
 
 
 @app.route('/')
@@ -15,19 +10,12 @@ def index():
 
 @app.route('/data/indexes_health', methods=['GET'])
 def data_index_health():
-    data, retcode = es_con.get_indexes_health()
+    data, retcode = data_cnt.get_indexes_health()
     return jsonify(data)
 
-
 @app.route('/data/breadcrumbs', methods=['GET'])
-def data_breadcrumbs():
-    data, retcode = es_con.get_product_breadcrums()
-    return jsonify([data])
-
-
-@app.route('/data/index_breadcrumbs', methods=['GET'])
-def data_index_breadcrumbs():
-    data, retcode = es_con.get_index_breadcrums()
+def data_breadcrumbs_full():
+    data, retcode = data_cnt.get_breadcrumbs()
     return jsonify([data])
 
 
@@ -35,55 +23,51 @@ def data_index_breadcrumbs():
 def product_get():
     content = request.json
     category = content['category_name']
-    data, retcode = es_con.get_category_products(category)
+    data, retcode = product_cnt.get_category_products(category)
     return jsonify(data)
+
+@app.route('/product/breadcrumbs', methods=['GET'])
+def data_index_breadcrumbs():
+    data, retcode = product_cnt.get_breadcrumbs()
+    return jsonify([data])
+
 
 @app.route('/product/review', methods=['POST'])
 def product_review_get():
     content = request.json
     product_name = content['product_name']
-    data, retcode = es_con.get_reviews_from_product(product_name)
+    data, retcode = product_cnt.get_product_reviews(product_name)
     return jsonify(data)
+
 
 @app.route('/product/image', methods=['POST'])
 def product_img_get():
     content = request.json
     url = content['url']
-    data = {}
-    ret_code = 200
-    try:
-        xml = BeautifulSoup(urlopen(url), 'lxml')
-        src = xml.find('td').find('img').get('src')
+    data, ret_code = product_cnt.get_product_image_url(url)
 
-        data['src'] = src
+    return jsonify(data)
 
-    except AttributeError as e:
-        print(e, file=sys.stderr)
-        ret_code = 404
-    except Exception as e:
-        print(e, file=sys.stderr)
-        ret_code = 500
-    finally:
-        return jsonify(data)
 
 @app.route('/generate/data', methods=['POST'])
 def generate_dataset():
     content = request.json
 
-    data = dataset_generator.generate(content)
-
-    if 'error' in data:
-        abort(400, data['error'])
-    else:
-        data_file = io.BytesIO()
-        with zipfile.ZipFile(data_file, mode='w') as z:
-            for key, value in data.items():
-                z.writestr(key, ''.join(value))
-        data_file.seek(0)
-
+    data, retcode = generate_cnt(content)
+    # data = dataset_generator.generate(content)
+    if retcode == 200:
         return send_file(
-            data_file,
+            data,
             mimetype='application/zip',
             as_attachment=True,
             attachment_filename='data.zip'
         )
+    else:
+        abort(retcode, data['error'])
+
+
+@app.route('/experiment/cluster', methods=['POST'])
+def experiment_cluster():
+    content = request.json
+    print(content)
+
