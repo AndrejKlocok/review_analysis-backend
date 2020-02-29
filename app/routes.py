@@ -1,4 +1,4 @@
-from app import app, product_cnt, generate_cnt, data_cnt
+from app import app, product_cnt, generate_cnt, data_cnt, experiment_cnt
 from flask import jsonify, request, send_file, abort
 
 
@@ -71,3 +71,9 @@ def experiment_cluster():
     content = request.json
     print(content)
 
+    data, retcode = experiment_cnt.cluster_similarity(content)
+
+    if retcode == 200:
+        return jsonify(data)
+    else:
+        abort(retcode, data['error'])

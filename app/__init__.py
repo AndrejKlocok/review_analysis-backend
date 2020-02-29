@@ -4,19 +4,21 @@ import sys
 
 sys.path.append('../')
 
+from review_analysis.utils.elastic_connector import Connector
 from .controllers.ProductController import ProductController
 from .controllers.GenerateDataController import GenerateDataController
 from .controllers.DataController import DataController
 from .controllers.ExperimentController import ExperimentController
 
-#app = Flask(__name__)
-#CORS(app)
-#es_con = Connector()
-#product_cnt = ProductController(es_con)
-#generate_cnt = GenerateDataController(es_con)
-#data_cnt = DataController(es_con)
+app = Flask(__name__)
+CORS(app)
+es_con = Connector()
+product_cnt = ProductController(es_con)
+generate_cnt = GenerateDataController(es_con)
+data_cnt = DataController(es_con)
+experiment_cnt = ExperimentController(es_con)
 
-#from app import routes
+from app import routes
 
 if __name__ == '__main__':
     app.run(debug=True, port=8081)
