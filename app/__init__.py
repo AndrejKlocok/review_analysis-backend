@@ -8,7 +8,8 @@ from review_analysis.utils.elastic_connector import Connector
 from .controllers.ProductController import ProductController
 from .controllers.GenerateDataController import GenerateDataController
 from .controllers.DataController import DataController
-from .controllers.ExperimentController import ExperimentController
+from .controllers.ExperimentClusterController import ExperimentClusterController
+from .controllers.ReviewExperimentController import ReviewController
 
 app = Flask(__name__)
 CORS(app)
@@ -16,7 +17,8 @@ es_con = Connector()
 product_cnt = ProductController(es_con)
 generate_cnt = GenerateDataController(es_con)
 data_cnt = DataController(es_con)
-experiment_cnt = ExperimentController(es_con)
+experiment_cluster_cnt = ExperimentClusterController(es_con)
+review_cnt = ReviewController(es_con)
 
 from app import routes
 

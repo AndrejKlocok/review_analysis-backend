@@ -1,8 +1,6 @@
-from review_analysis.utils.elastic_connector import Connector
+from .Controller import Controller
 
-class DataController:
-    def __init__(self, con: Connector):
-        self.connector = con
+class DataController(Controller):
 
     def get_indexes_health(self):
         return self.connector.get_indexes_health()

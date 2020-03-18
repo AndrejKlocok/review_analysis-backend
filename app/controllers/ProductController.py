@@ -1,14 +1,10 @@
-from review_analysis.utils.elastic_connector import Connector
-
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
 import sys
+from .Controller import Controller
 
 
-class ProductController:
-    def __init__(self, con: Connector):
-        self.connector = con
-        pass
+class ProductController(Controller):
 
     def get_breadcrumbs(self):
         return self.connector.get_product_breadcrums()
