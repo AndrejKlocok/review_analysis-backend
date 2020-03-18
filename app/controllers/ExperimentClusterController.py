@@ -125,6 +125,11 @@ class ExperimentClusterController:
         sentences_con = []
 
         reviews, ret = self.connector.get_reviews_from_category(category)
+
+        # check if it is not product
+        if ret == 404:
+            reviews, ret = self.connector.get_reviews_from_product(category)
+
         # if ret != 200:
         #    raise WrongProperty('No reviews found for category: {}'.format(cat))
 
