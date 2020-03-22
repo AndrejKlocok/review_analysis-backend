@@ -91,6 +91,13 @@ def experiment_text_rating():
 
     return jsonify(data), ret_code
 
+@app.route('/experiment/text_irrelevant', methods=['POST'])
+def experiment_text_irrelevant():
+    content = request.json
+    data, ret_code = review_cnt.get_irrelevant(content)
+
+    return jsonify(data), ret_code
+
 
 @app.route('/experiment/sentences', methods=['POST'])
 def experiment_sentences():
@@ -116,6 +123,14 @@ def experiment_cluster():
     else:
         data, ret_code = experiment_cluster_cnt.cluster_similarity(content)
 
+    return jsonify(data), ret_code
+
+
+@app.route('/experiment/cluster_merge', methods=['POST'])
+def experiment_cluster_merge():
+    content = request.json
+    print(content)
+    data, ret_code = experiment_cluster_cnt.cluster_merge(content)
     return jsonify(data), ret_code
 
 

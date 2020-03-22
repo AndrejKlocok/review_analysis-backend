@@ -4,6 +4,7 @@ from nltk.tokenize import sent_tokenize
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from review_analysis.clasification.bert_model import Bert_model
+from review_analysis.clasification.SVM_model import SVM_Classifier
 from review_analysis.utils.morpho_tagger import MorphoTagger
 
 
@@ -15,6 +16,8 @@ class ReviewController:
         self.tagger = MorphoTagger()
         self.tagger.load_tagger()
         self.pos_con_labels = ['+', '-']
+        self.irrelevant_model = SVM_Classifier()
+        #self.irrelevant_model.load_models()
         #self.pos_con_model = Bert_model(path+'bert_bipolar',
         #                                self.pos_con_labels)
         #self.pos_con_model.do_eval()
@@ -74,14 +77,9 @@ class ReviewController:
                 })
 
             if config['summary']:
-                topic_words = []
                 exp, code = self.connector.get_experiments_by_category(config['category'])
                 exp = exp[0]
-                for topic_d in (exp['topics_con']+exp['topics_pos']):
-                    for topic_str in topic_d['topics']:
-                        for topic in topic_str.split():
-                            if topic not in topic_words:
-                                topic_words.append(topic)
+                topic_words = exp['sal_con']+exp['sal_pos']
 
                 for sentence in sent_tokenize(config['summary'], 'czech'):
                     sentence_out = []
@@ -131,5 +129,17 @@ class ReviewController:
             return data, ret_code
 
         except Exception as e:
-            print('ExperimentController-get_polarity_sentence: {}'.format(str(e)), file=sys.stderr)
+            print('ExperimentController-get_text_rating: {}'.format(str(e)), file=sys.stderr)
+            return {'error': str(e), 'error_code': 500}, 500
+
+    def get_irrelevant(self, config):
+        data = {}
+        ret_code = 200
+        try:
+            label_str = self.irrelevant_model.eval_example(config['text'])
+            data['label'] = label_str
+            return data, ret_code
+
+        except Exception as e:
+            print('ExperimentController-get_irrelevant: {}'.format(str(e)), file=sys.stderr)
             return {'error': str(e), 'error_code': 500}, 500

@@ -375,3 +375,12 @@ class ExperimentClusterController:
         except Exception as e:
             print('ExperimentController-cluster_similarity: {}'.format(str(e)), file=sys.stderr)
             return {'error': str(e), 'error_code': 500}, 500
+
+    def cluster_merge(self, config: dict):
+        try:
+            data, ret_code = self.connector.merge_experiment_cluster(config['cluster_from'], config['cluster_to'])
+            return data, ret_code
+
+        except Exception as e:
+            print('ExperimentController-cluster_merge: {}'.format(str(e)), file=sys.stderr)
+            return {'error': str(e), 'error_code': 500}, 500
