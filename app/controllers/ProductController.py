@@ -9,11 +9,18 @@ class ProductController(Controller):
     def get_breadcrumbs(self):
         return self.connector.get_product_breadcrums()
 
-    def get_category_products(self, category_name:str):
-        return self.connector.get_category_products(category_name)
+    def get_category_products(self, content: dict):
+        category = content['category_name']
+        if category == 'shop':
+            return self.connector.get_shops()
+        else:
+            return self.connector.get_category_products(category)
 
-    def get_product_reviews(self, product_name:str):
-        return self.connector.get_reviews_from_product(product_name)
+    def get_product_reviews(self, content: dict):
+        if content['domain'] == 'shop':
+            return self.connector.get_reviews_from_shop(content['name'])
+        else:
+            return self.connector.get_reviews_from_product(content['name'])
 
     def get_product_image_url(self, product_url:str):
         data = {}
