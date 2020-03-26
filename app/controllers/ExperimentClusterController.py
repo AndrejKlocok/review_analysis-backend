@@ -218,6 +218,8 @@ class ExperimentClusterController:
 
             data = data[0]
 
+            salient = list(set(data['sal_pos'] + data['sal_con']))
+
             output_d = {
                 'pos': {
                     'sentences_count': data['pos_sentences'],
@@ -228,7 +230,9 @@ class ExperimentClusterController:
                     'sentences_count': data['con_sentences'],
                     'clusters': data['clusters_con'],
                     'sal_con': data['sal_con'],
-                }
+                },
+                'sal_pos': data['sal_pos'],
+                'sal_con': data['sal_con'],
             }
 
             return output_d, ret_code

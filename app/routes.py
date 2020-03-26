@@ -93,6 +93,13 @@ def product_img_get():
 
     return jsonify(data), ret_code
 
+@token_required
+@app.route('/product/statistics', methods=['POST'])
+def product_statistics():
+    content = request.json
+    data, ret_code = product_cnt.get_statistics(content)
+
+    return jsonify(data), ret_code
 
 @token_required
 @app.route('/generate/data', methods=['POST'])

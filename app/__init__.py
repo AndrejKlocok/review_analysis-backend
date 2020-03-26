@@ -18,11 +18,11 @@ CORS(app)
 app.config['SECRET_KEY'] = secrets.token_urlsafe(32)
 
 es_con = Connector()
-product_cnt = ProductController(es_con)
 generate_cnt = GenerateDataController(es_con)
 data_cnt = DataController(es_con)
 experiment_cluster_cnt = ExperimentClusterController(es_con)
 review_cnt = ReviewController(es_con)
+product_cnt = ProductController(es_con)
 user_cnt = UserController(es_con)
 
 from app import routes

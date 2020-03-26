@@ -16,13 +16,13 @@ class ReviewController:
         self.tagger = MorphoTagger()
         self.tagger.load_tagger()
         self.pos_con_labels = ['+', '-']
-        self.irrelevant_model = SVM_Classifier()
+        #self.irrelevant_model = SVM_Classifier()
         #self.irrelevant_model.load_models()
-        #self.pos_con_model = Bert_model(path+'bert_bipolar',
-        #                                self.pos_con_labels)
-        #self.pos_con_model.do_eval()
-        #self.regression_model = Bert_model(path+'bert_regression', [])
-        #self.regression_model.do_eval()
+        self.pos_con_model = Bert_model(path+'bert_bipolar',
+                                        self.pos_con_labels)
+        self.pos_con_model.do_eval()
+        self.regression_model = Bert_model(path+'bert_regression', [])
+        self.regression_model.do_eval()
 
     def __clear_sentence(self, sentence: str) -> str:
         sentence = sentence.strip().capitalize()
@@ -37,12 +37,27 @@ class ReviewController:
         sentence = self.__clear_sentence(sentence)
         return sentence, model.eval_example('a', sentence, useLabels)
 
-    def __merge_review_text(self, pos: list, con: list, summary: str):
+    def merge_review_text(self, pos: list, con: list, summary: str):
         text = []
         text += [self.__clear_sentence(s) for s in pos]
         text += [self.__clear_sentence(s) for s in con]
         text += [summary]
         return ' '.join(text)
+
+    def __salient(self, s, salient):
+        sentence_out = []
+        sentence_pos_list = self.tagger.pos_tagging(s, False, False)
+        for sentence_wp_list in sentence_pos_list:
+            for wp in sentence_wp_list:
+                if wp.lemma in salient and wp.tag[0] in ['N']:
+                    sentence_out.append('<b>' + wp.token + '</b>')
+                else:
+                    sentence_out.append(wp.token)
+        sentence = ' '.join(sentence_out)
+        return sentence
+
+    def __round_percentage(self, number):
+        return round(round(number*100.0, -1))
 
     def get_review_experiment(self, config):
         data = {
@@ -53,17 +68,26 @@ class ReviewController:
         }
         ret_code = 200
         try:
-
-            review_text = self.__merge_review_text(config['pos'], config['con'], config['summary'])
+            review_text = self.merge_review_text(config['pos'], config['con'], config['summary'])
 
             if review_text:
                 _, rating = self.__eval_sentence(self.regression_model, review_text, useLabels=False)
-                data['rating'] = '{:2.2f}%'.format(rating*100.0)
+
+                rating = self.__round_percentage(rating)
+                data['rating'] = '{}%'.format(rating)
             else:
                 raise ValueError('Empty review')
 
+            exp, _ = self.connector.get_experiments_by_category(config['category'])
+            topic_words = []
+            if exp:
+                exp = exp[0]
+                topic_words = exp['sal_con'] + exp['sal_pos']
+
             for sentence in config['pos']:
                 s, label = self.__eval_sentence(self.pos_con_model, sentence)
+                if topic_words:
+                    s = self.__salient(s, topic_words)
                 data['pos_labels'].append({
                     'sentence':s,
                     'label': label
@@ -71,28 +95,19 @@ class ReviewController:
 
             for sentence in config['con']:
                 s, label = self.__eval_sentence(self.pos_con_model, sentence)
+                if topic_words:
+                    s = self.__salient(s, topic_words)
                 data['con_labels'].append({
                     'sentence':s,
                     'label': label
                 })
 
             if config['summary']:
-                exp, code = self.connector.get_experiments_by_category(config['category'])
-                exp = exp[0]
-                topic_words = exp['sal_con']+exp['sal_pos']
-
                 for sentence in sent_tokenize(config['summary'], 'czech'):
-                    sentence_out = []
-                    s, label = self.__eval_sentence(self.pos_con_model, sentence)
-                    sentence_pos_list = self.tagger.pos_tagging(s, False, False)
-                    for sentence_wp_list in sentence_pos_list:
-                        for wp in sentence_wp_list:
-                            if wp.lemma in topic_words and wp.tag[0] in ['N']:
-                                sentence_out.append('<b>'+wp.token+'</b>')
-                            else:
-                                sentence_out.append(wp.token)
+                    sentence, label = self.__eval_sentence(self.pos_con_model, sentence)
+                    if topic_words:
+                        sentence = self.__salient(sentence, topic_words)
 
-                    sentence = ' '.join(sentence_out)
                     data['summary_labels'].append({
                         'sentence': sentence,
                         'label': label
@@ -125,7 +140,9 @@ class ReviewController:
         ret_code = 200
         try:
             _, rating = self.__eval_sentence(self.regression_model, config['text'], useLabels=False)
-            data['rating'] = '{:2.2f}%'.format(rating * 100.0)
+            data['rating_f'] = rating
+            data['rating'] = self.__round_percentage(rating)
+
             return data, ret_code
 
         except Exception as e:
