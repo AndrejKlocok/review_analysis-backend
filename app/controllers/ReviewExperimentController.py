@@ -12,6 +12,7 @@ class ReviewController:
     def __init__(self, con: Connector):
         self.connector = con
         path = '/home/andrej/Documents/school/Diplomka/model/'
+        #path = '/mnt/data/xkloco00_a18/model/'
         self.re_int = re.compile(r'^[-+]?([1-9]\d*|0)$')
         self.tagger = MorphoTagger()
         self.tagger.load_tagger()

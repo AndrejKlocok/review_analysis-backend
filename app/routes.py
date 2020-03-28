@@ -59,6 +59,13 @@ def data_breadcrumbs_full():
     data, ret_code = data_cnt.get_breadcrumbs()
     return jsonify([data]), ret_code
 
+@token_required
+@app.route('/data/actualization_statistics', methods=['POST'])
+def data_actualization_statistics():
+    content = request.json
+    data, ret_code = data_cnt.get_actualization_statistics(content)
+    return jsonify([data]), ret_code
+
 
 @token_required
 @app.route('/product/', methods=['POST'])
