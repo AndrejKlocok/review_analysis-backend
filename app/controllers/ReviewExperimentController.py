@@ -13,17 +13,46 @@ class ReviewController:
         self.connector = con
         path = '/home/andrej/Documents/school/Diplomka/model/'
         #path = '/mnt/data/xkloco00_a18/model/'
+        #path = '/tmp/xkloco00/athena18/model/'
         self.re_int = re.compile(r'^[-+]?([1-9]\d*|0)$')
         self.tagger = MorphoTagger()
         self.tagger.load_tagger()
-        self.pos_con_labels = ['+', '-']
+        self.pos_con_labels = ['0', '1']
         #self.irrelevant_model = SVM_Classifier()
         #self.irrelevant_model.load_models()
         self.pos_con_model = Bert_model(path+'bert_bipolar',
                                         self.pos_con_labels)
         self.pos_con_model.do_eval()
+
         self.regression_model = Bert_model(path+'bert_regression', [])
         self.regression_model.do_eval()
+        self.model_d = self._load_models(path, self.pos_con_labels)
+        self.model_d['general'] = self.pos_con_model
+
+    def _load_models(self, path, labels):
+        d = {
+        }
+        indexes = [
+            'elektronika',
+            'bile_zbozi',
+            'dum_a_zahrada',
+            'chovatelstvi',
+            'auto-moto',
+            'detske_zbozi',
+            'obleceni_a_moda',
+            'filmy_knihy_hry',
+            'kosmetika_a_zdravi',
+            'sport',
+            'hobby',
+            'jidlo_a_napoje',
+            'stavebniny',
+            'sexualni_a_eroticke_pomucky',
+        ]
+        #for value in indexes:
+        #    d[value] = Bert_model(path + 'bert_bipolar_domain/' + value, labels)
+        #    d[value].do_eval()
+
+        return d
 
     def __clear_sentence(self, sentence: str) -> str:
         sentence = sentence.strip().capitalize()
@@ -62,22 +91,31 @@ class ReviewController:
 
     def get_review_experiment(self, config):
         data = {
+            'pos_model': [],
+            'con_model': [],
             'pos_labels': [],
             'con_labels': [],
-            'rating': '',
+            'rating_model': '',
             'summary_labels': [],
         }
         ret_code = 200
         try:
-            review_text = self.merge_review_text(config['pos'], config['con'], config['summary'])
+            review = self.connector.get_review_by_id(config['_id'], config['category'])
+            if not review:
+                raise ValueError('Review was not found')
 
-            if review_text:
-                _, rating = self.__eval_sentence(self.regression_model, review_text, useLabels=False)
+            # not all reviews are processed with rating predictor model
+            if 'rating_model' not in review:
+                review_text = self.merge_review_text(review['pros'], review['cons'], review['summary'])
+                if review_text:
+                    _, rating = self.__eval_sentence(self.regression_model, review_text, useLabels=False)
 
-                rating = self.__round_percentage(rating)
-                data['rating'] = '{}%'.format(rating)
+                    rating = self.__round_percentage(rating)
+                    data['rating_model'] = '{}%'.format(rating)
+                else:
+                    raise ValueError('Empty review')
             else:
-                raise ValueError('Empty review')
+                data['rating_model'] = review['rating_model']
 
             exp, _ = self.connector.get_experiments_by_category(config['category'])
             topic_words = []
@@ -85,7 +123,7 @@ class ReviewController:
                 exp = exp[0]
                 topic_words = exp['sal_con'] + exp['sal_pos']
 
-            for sentence in config['pos']:
+            for sentence in review['pros']:
                 s, label = self.__eval_sentence(self.pos_con_model, sentence)
                 if topic_words:
                     s = self.__salient(s, topic_words)
@@ -94,7 +132,7 @@ class ReviewController:
                     'label': label
                 })
 
-            for sentence in config['con']:
+            for sentence in review['cons']:
                 s, label = self.__eval_sentence(self.pos_con_model, sentence)
                 if topic_words:
                     s = self.__salient(s, topic_words)
@@ -103,8 +141,34 @@ class ReviewController:
                     'label': label
                 })
 
-            if config['summary']:
-                for sentence in sent_tokenize(config['summary'], 'czech'):
+            # pos model exists
+            if 'pos_model' in review:
+                data['pos_model'] = review['pos_model']
+            else:
+                for sentence in review['pros']:
+                    model_review = []
+
+                    for category, model in self.model_d.items():
+                        s, label = self.__eval_sentence(model, sentence)
+                        model_review.append([label, category + '_model'])
+
+                    data['pos_model'].append(model_review)
+
+            # con model exists
+            if 'con_model' in review:
+                data['con_model'] = review['con_model']
+            else:
+                for sentence in review['cons']:
+                    model_review = []
+
+                    for category, model in self.model_d.items():
+                        s, label = self.__eval_sentence(model, sentence)
+                        model_review.append([s, label, category + '_model'])
+
+                    data['con_model'].append(model_review)
+
+            if review['summary']:
+                for sentence in sent_tokenize(review['summary'], 'czech'):
                     sentence, label = self.__eval_sentence(self.pos_con_model, sentence)
                     if topic_words:
                         sentence = self.__salient(sentence, topic_words)
@@ -128,7 +192,13 @@ class ReviewController:
         data = {}
         ret_code = 200
         try:
-            _, data['polarity'] = self.__eval_sentence(self.pos_con_model, config['sentence'])
+            try:
+                model = self.model_d['model_type']
+            # wrong model name -> use general
+            except Exception as e:
+                model = self.model_d['general']
+
+            _, data['polarity'] = self.__eval_sentence(model, config['sentence'])
 
             return data, ret_code
 

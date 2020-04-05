@@ -32,7 +32,7 @@ def token_required(f):
                 raise RuntimeError('User not found')
             return f(user, *args, **kwargs)
         except jwt.ExpiredSignatureError:
-            return jsonify(expired_msg), 401 # 401 is Unauthorized HTTP status code
+            return jsonify(expired_msg), 401  # 401 is Unauthorized HTTP status code
         except (jwt.InvalidTokenError, Exception) as e:
             print(e)
             return jsonify(invalid_msg), 401
@@ -59,12 +59,13 @@ def data_breadcrumbs_full():
     data, ret_code = data_cnt.get_breadcrumbs()
     return jsonify([data]), ret_code
 
+
 @token_required
 @app.route('/data/actualization_statistics', methods=['POST'])
 def data_actualization_statistics():
     content = request.json
     data, ret_code = data_cnt.get_actualization_statistics(content)
-    return jsonify([data]), ret_code
+    return jsonify(data), ret_code
 
 
 @token_required
@@ -100,6 +101,7 @@ def product_img_get():
 
     return jsonify(data), ret_code
 
+
 @token_required
 @app.route('/product/statistics', methods=['POST'])
 def product_statistics():
@@ -107,6 +109,7 @@ def product_statistics():
     data, ret_code = product_cnt.get_statistics(content)
 
     return jsonify(data), ret_code
+
 
 @token_required
 @app.route('/generate/data', methods=['POST'])
@@ -151,6 +154,7 @@ def experiment_text_rating():
     data, ret_code = review_cnt.get_text_rating(content)
 
     return jsonify(data), ret_code
+
 
 @token_required
 @app.route('/experiment/text_irrelevant', methods=['POST'])
@@ -200,6 +204,33 @@ def experiment_cluster_merge():
 
 
 @token_required
+@app.route('/experiment/experiment_cluster', methods=['POST'])
+def experiment_experiment_cluster():
+    content = request.json
+    print(content)
+    data, ret_code = experiment_cluster_cnt.create_cluster(content)
+    return jsonify(data), ret_code
+
+
+@token_required
+@app.route('/experiment/update_sentence', methods=['POST'])
+def experiment_update_sentence():
+    content = request.json
+    print(content)
+    data, ret_code = experiment_cluster_cnt.update_sentence(content)
+    return jsonify(data), ret_code
+
+
+@token_required
+@app.route('/experiment/experiment_cluster_topics', methods=['PUT'])
+def experiment_cluster_topics():
+    content = request.json
+    print(content)
+    data, ret_code = experiment_cluster_cnt.update_topics(content)
+    return jsonify(data), ret_code
+
+
+@token_required
 @app.route('/experiment/cluster/topic', methods=['PUT'])
 def experiment_cluster_topic():
     content = request.json
@@ -226,16 +257,16 @@ def login():
     user = user_cnt.authenticate(**data)
 
     if not user:
-        return jsonify({ 'error': 'Invalid credentials', 'authenticated': False,
-                         'error_code': 401}), 401
+        return jsonify({'error': 'Invalid credentials', 'authenticated': False,
+                        'error_code': 401}), 401
 
     token = jwt.encode({
         'sub': user.name,
-        'iat':datetime.utcnow(),
+        'iat': datetime.utcnow(),
         'exp': datetime.utcnow() + timedelta(minutes=30)},
         current_app.config['SECRET_KEY'])
-    return jsonify({ 'token': token.decode('UTF-8'),
-                     'user': user.to_dict()})
+    return jsonify({'token': token.decode('UTF-8'),
+                    'user': user.to_dict()})
 
 
 @app.route('/register/', methods=('POST',))
