@@ -226,17 +226,19 @@ def experiment_update_sentence():
 def experiment_cluster_topics():
     content = request.json
     print(content)
-    data, ret_code = experiment_cluster_cnt.update_topics(content)
+    data, ret_code = experiment_cluster_cnt.append_topics(content)
     return jsonify(data), ret_code
 
 
 @token_required
-@app.route('/experiment/cluster/topic', methods=['PUT'])
+@app.route('/experiment/cluster/topic', methods=['POST', 'PUT'])
 def experiment_cluster_topic():
     content = request.json
     print(content)
-
-    data, ret_code = experiment_cluster_cnt.update_experiment_cluster_topics(content)
+    if request.method == 'POST':
+        data, ret_code = experiment_cluster_cnt.merge_topic(content)
+    else:
+        data, ret_code = experiment_cluster_cnt.update_topic_name(content)
 
     return jsonify(data), ret_code
 

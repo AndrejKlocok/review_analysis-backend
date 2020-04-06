@@ -18,8 +18,8 @@ class ReviewController:
         self.tagger = MorphoTagger()
         self.tagger.load_tagger()
         self.pos_con_labels = ['0', '1']
-        #self.irrelevant_model = SVM_Classifier()
-        #self.irrelevant_model.load_models()
+        self.irrelevant_model = SVM_Classifier()
+        self.irrelevant_model.load_models()
         self.pos_con_model = Bert_model(path+'bert_bipolar',
                                         self.pos_con_labels)
         self.pos_con_model.do_eval()
@@ -48,9 +48,9 @@ class ReviewController:
             'stavebniny',
             'sexualni_a_eroticke_pomucky',
         ]
-        #for value in indexes:
-        #    d[value] = Bert_model(path + 'bert_bipolar_domain/' + value, labels)
-        #    d[value].do_eval()
+        for value in indexes:
+            d[value] = Bert_model(path + 'bert_bipolar_domain/' + value, labels)
+            d[value].do_eval()
 
         return d
 
@@ -137,7 +137,7 @@ class ReviewController:
                 if topic_words:
                     s = self.__salient(s, topic_words)
                 data['con_labels'].append({
-                    'sentence':s,
+                    'sentence': s,
                     'label': label
                 })
 
@@ -163,7 +163,7 @@ class ReviewController:
 
                     for category, model in self.model_d.items():
                         s, label = self.__eval_sentence(model, sentence)
-                        model_review.append([s, label, category + '_model'])
+                        model_review.append([label, category + '_model'])
 
                     data['con_model'].append(model_review)
 

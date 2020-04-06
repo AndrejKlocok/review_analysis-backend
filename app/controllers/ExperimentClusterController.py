@@ -73,10 +73,10 @@ class ExperimentClusterController:
         }
 
         sentences_pos = [sentence['sentence_pos'] for sentence in sentences]
-        labels = self.fastTextModel.cluster_similarity(sentences_pos, pretrained=False, embedding=embedding_type,
-                                                       cluster=cluster_method, cluster_cnt=clusters_count)
-        #import math, random
-        #labels = [math.floor(random.uniform(0, 7)) for _ in sentences_pos]
+        #labels = self.fastTextModel.cluster_similarity(sentences_pos, pretrained=False, embedding=embedding_type,
+        #                                               cluster=cluster_method, cluster_cnt=clusters_count)
+        import math, random
+        labels = [math.floor(random.uniform(0, 7)) for _ in sentences_pos]
         cnt = Counter(labels)
 
         clusters = {}
@@ -93,6 +93,7 @@ class ExperimentClusterController:
             cluster_id = self.save_cluster_meta(cluster_meta)
             if not cluster_id:
                 raise Exception('Cluster not saved')
+
             cluster_meta['cluster_id'] = cluster_id
             clusters[key] = cluster_meta
             label_to_cluster_id[key] = cluster_id
@@ -100,6 +101,7 @@ class ExperimentClusterController:
         for index, label in enumerate(labels):
             sentences[index]['cluster_number'] = label_to_cluster_id[label]
             sentences[index]['topic_number'] = 0
+            sentences[index]['topic_id'] = ''
             sentences[index]['experiment_id'] = experiment_id
             clusters[label]['sentences'].append(sentences[index])
 
@@ -107,17 +109,37 @@ class ExperimentClusterController:
         salient_words = lda.load_sentences_from_api(clusters, self.tagger)
 
         for _, value in clusters.items():
+            topic_to_id = {}
             cluster['clusters'].append(value)
-            if value['topics']:
-                res, ret_code = self.connector.update_experiment_cluster_topics(value['cluster_id'], value['topics'])
-                if res['result'] != 'updated':
-                    raise Exception('Update of topics failed')
+            if not value['topics']:
+                value['topics'] = ['topic_numb_0']
+
+            # check for duplicate topic names
+            if len(list(set(value['topics']))) != len(value['topics']):
+                i = 0
+                for topic in value['topics']:
+                    topic = topic + '_' + str(i)
+
+            for index, topic in enumerate(value['topics']):
+                d = {
+                    "experiment_id": experiment_id,
+                    "cluster_number": value['cluster_id'],
+                    "name": topic,
+                    "topic_number": index,
+                }
+                topic_id = self.save_topic(d)
+                if not topic_id:
+                    raise Exception('Did not saved: {}'.format(str(d)))
+                topic_to_id[index] = topic_id
 
             for sentence in value['sentences']:
+                sentence['topic_id'] = topic_to_id[sentence['topic_number']]
                 if not self.save_sentence(sentence):
                     print('Did not saved: {}'.format(sentence['sentence']), file=sys.stderr)
 
         self.connector.es.indices.refresh(index="experiment_sentence")
+        self.connector.es.indices.refresh(index="experiment_topic")
+        self.connector.es.indices.refresh(index="experiment_cluster")
         return cluster, salient_words
 
     def __get_reviews_sentences(self, category):
@@ -159,10 +181,11 @@ class ExperimentClusterController:
         experiment_sentence = {
             "review_id": sentence['review_id'],
             "experiment_id": sentence['experiment_id'],
+            "topic_number": sentence['topic_number'],
+            "topic_id": sentence['topic_id'],
             "cluster_number": sentence['cluster_number'],
             "product_name": sentence['product_name'],
             "category_name": sentence['category_name'],
-            "topic_number": sentence['topic_number'],
             "sentence": sentence['sentence'],
             "sentence_index": sentence['sentence_index'],
             "sentence_pos": sentence['sentence_pos'],
@@ -173,14 +196,25 @@ class ExperimentClusterController:
             return True
         return False
 
+    def save_topic(self, topic_d: dict):
+        experiment_topic = {
+            "experiment_id": topic_d['experiment_id'],
+            "cluster_number": topic_d['cluster_number'],
+            "name": topic_d['name'],
+            "topic_number": topic_d["topic_number"],
+        }
+        res = self.connector.index(index='experiment_topic', doc=experiment_topic)
+        if res['result'] == 'created':
+            return res['_id']
+        return None
+
     def save_cluster_meta(self, cluster_d: dict):
         cluster = {
             'experiment_id': cluster_d['experiment_id'],
             'type': cluster_d['type'],
             'cluster_name': 'cluster_' + str(cluster_d['cluster_number']),
             'cluster_number': cluster_d['cluster_number'],
-            'topics': cluster_d['topics'],
-            #'cluster_sentences_count': cluster_d['cluster_sentences_count'],
+            # 'topics': cluster_d['topics'],
         }
 
         res = self.connector.index(index='experiment_cluster', doc=cluster)
@@ -278,11 +312,11 @@ class ExperimentClusterController:
             print('ExperimentController-update_experiment_cluster_name: {}'.format(str(e)), file=sys.stderr)
             return {'error': str(e), 'error_code': 500}, 500
 
-    def update_experiment_cluster_topics(self, content):
+    def update_topic_name(self, content):
         try:
 
-            data, ret_code = self.connector.update_experiment_cluster_topics(
-                content['cluster_id'], content['topics'])
+            data, ret_code = self.connector.update_experiment_cluster_topic(
+                content['topic_id'], content['topic_name'])
 
             if ret_code == 200:
                 return data, ret_code
@@ -294,7 +328,7 @@ class ExperimentClusterController:
                 return data, ret_code
 
         except Exception as e:
-            print('ExperimentController-update_experiment_cluster_topics: {}'.format(str(e)), file=sys.stderr)
+            print('ExperimentController-update_topic_name: {}'.format(str(e)), file=sys.stderr)
             return {'error': str(e), 'error_code': 500}, 500
 
     def peek_sentences(self, config: dict):
@@ -328,13 +362,15 @@ class ExperimentClusterController:
         start = time.time()
         data = {}
         try:
-            # TODO check already done experiments
-            # TODO check config validity
             embedding_type = self.__get_embedding_type(config)
             cluster_method = self.__get_cluster_method(config)
             if not config['category']:
                 # raise WrongProperty('Empty category')
-                return None, 500
+                raise KeyError('category not found')
+
+            d_existing, r_c = self.connector.get_experiments_by_category(config['category'])
+            if d_existing or r_c == 400:
+                raise KeyError('Experiment already exists')
 
             # create sentences pos cons
             sentences_pro, sentences_con = self.__get_reviews_sentences(config['category'])
@@ -387,7 +423,8 @@ class ExperimentClusterController:
     def update_sentence(self, config: dict):
         try:
             data, ret_code = self.connector.update_experiment_cluster_sentence(
-                config['cluster_id'], config['sentence_id'], config['topic_number'])
+                config['cluster_id'], config['sentence_id'],
+                config['topic_number'], config['topic_id'])
             return data, ret_code
 
         except Exception as e:
@@ -401,28 +438,56 @@ class ExperimentClusterController:
                 'type': config['type'],
                 'cluster_name': config['cluster_name'],
                 'cluster_number': config['cluster_number'],
-                'topics': config['topics'],
             }
 
-            res = self.connector.index(index='experiment_cluster', doc=cluster)
+            res_cluster = self.connector.index(index='experiment_cluster', doc=cluster)
+            if res_cluster['result'] != 'created':
+                raise Exception('Cluster was not created')
 
-            if res['result'] == 'created':
-                return {'experiment_id': res['_id']}, 200
-            else:
-                return {'error': 'Experiment was not created', 'error_code': 400, 'reason': str(res)}
+            for index, topic in enumerate(config['topics']):
+                d = {
+                    "experiment_id": config['experiment_id'],
+                    "cluster_number": res_cluster['_id'],
+                    "name": topic,
+                    "topic_number": index,
+                }
+                res_topic = self.save_topic(d)
+                if not res_topic:
+                    raise Exception('Topic: {} was not created'.format(topic))
+
+            return {'experiment_id': res_cluster['_id']}, 200
 
         except Exception as e:
             print('ExperimentController-create_cluster: {}'.format(str(e)), file=sys.stderr)
             return {'error': str(e), 'error_code': 500}, 500
 
-    def update_topics(self, config: dict):
+    def append_topics(self, config: dict):
         try:
-            res = self.connector.append_experiment_cluster_topic(config['cluster_id'], config['topics'])
+            for index, topic in enumerate(config['topics']):
+                d = {
+                    "experiment_id": config['experiment_id'],
+                    "cluster_number": config['cluster_number'],
+                    "name": topic,
+                    "topic_number": index,
+                }
+                res = self.save_topic(d)
 
-            if res['result'] == 'created':
-                return {'cluster_id': res['_id']}, 200
-            else:
-                return {'error': 'Experiment was not created', 'error_code': 400}
+                if not res:
+                    raise Exception('Topic: {} was not created'.format(topic))
+
+            return {'cluster_id': config['cluster_number']}, 200
+
+        except Exception as e:
+            print('ExperimentController-create_cluster: {}'.format(str(e)), file=sys.stderr)
+            return {'error': str(e), 'error_code': 500}, 500
+
+    def merge_topic(self, config: dict):
+        try:
+            data, ret_code = self.connector.update_experiment_cluster_sentences(
+                config['topic_from_id'],
+                config['cluster_to_id'], config['topic_to_number'], config['topic_to_id'])
+
+            return data, ret_code
 
         except Exception as e:
             print('ExperimentController-create_cluster: {}'.format(str(e)), file=sys.stderr)
