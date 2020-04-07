@@ -73,10 +73,10 @@ class ExperimentClusterController:
         }
 
         sentences_pos = [sentence['sentence_pos'] for sentence in sentences]
-        #labels = self.fastTextModel.cluster_similarity(sentences_pos, pretrained=False, embedding=embedding_type,
-        #                                               cluster=cluster_method, cluster_cnt=clusters_count)
-        import math, random
-        labels = [math.floor(random.uniform(0, 7)) for _ in sentences_pos]
+        labels = self.fastTextModel.cluster_similarity(sentences_pos, pretrained=False, embedding=embedding_type,
+                                                       cluster=cluster_method, cluster_cnt=clusters_count)
+        #import math, random
+        #labels = [math.floor(random.uniform(0, 7)) for _ in sentences_pos]
         cnt = Counter(labels)
 
         clusters = {}
