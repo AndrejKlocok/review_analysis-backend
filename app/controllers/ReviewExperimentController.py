@@ -12,8 +12,8 @@ class ReviewController:
     def __init__(self, con: Connector):
         self.connector = con
         path = '/home/andrej/Documents/school/Diplomka/model/'
-        #path = '/mnt/data/xkloco00_a18/model/'
-        #path = '/tmp/xkloco00/athena18/model/'
+        #path = '/mnt/data/xkloco00_pc5/model/'
+
         self.re_int = re.compile(r'^[-+]?([1-9]\d*|0)$')
         self.tagger = MorphoTagger()
         self.tagger.load_tagger()
@@ -113,7 +113,7 @@ class ReviewController:
                     rating = self.__round_percentage(rating)
                     data['rating_model'] = '{}%'.format(rating)
                 else:
-                    raise ValueError('Empty review')
+                    raise KeyError('Empty review')
             else:
                 data['rating_model'] = review['rating_model']
 
@@ -180,6 +180,10 @@ class ReviewController:
 
             return data, ret_code
 
+        except KeyError as e:
+            print('ExperimentController-get_review_experiment: {}'.format(str(e)), file=sys.stderr)
+            return {'error': str(e), 'error_code': 404}, 404
+
         except ValueError as e:
             print('ExperimentController-get_review_experiment: {}'.format(str(e)), file=sys.stderr)
             return {'error': str(e), 'error_code': 400}, 400
@@ -193,10 +197,13 @@ class ReviewController:
         ret_code = 200
         try:
             try:
-                model = self.model_d['model_type']
+                model = self.model_d[config['model_type']]
+                data['model_type'] = config['model_type']
             # wrong model name -> use general
             except Exception as e:
+                print('ExperimentController-get_polarity_sentence: {}'.format(str(e)), file=sys.stderr)
                 model = self.model_d['general']
+                data['model_type'] = 'general'
 
             _, data['polarity'] = self.__eval_sentence(model, config['sentence'])
 

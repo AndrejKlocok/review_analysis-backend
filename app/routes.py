@@ -1,7 +1,6 @@
 from app import app, product_cnt, generate_cnt, data_cnt, experiment_cluster_cnt, review_cnt, user_cnt
 from flask import jsonify, request, send_file, current_app
 import jwt
-from app.models import User
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -32,18 +31,12 @@ def token_required(f):
                 raise RuntimeError('User not found')
             return f(user, *args, **kwargs)
         except jwt.ExpiredSignatureError:
-            return jsonify(expired_msg), 401  # 401 is Unauthorized HTTP status code
+            return jsonify(expired_msg), 401
         except (jwt.InvalidTokenError, Exception) as e:
             print(e)
             return jsonify(invalid_msg), 401
 
     return _verify
-
-
-@app.route('/')
-@app.route('/index')
-def index():
-    return "Hello, World!"
 
 
 @token_required

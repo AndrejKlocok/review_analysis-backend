@@ -31,6 +31,9 @@ class ProductController:
                 else:
                     review['rating_diff'] = 0
 
+                if 'filter_model' not in review:
+                    review['filter_model'] = False
+
             return reviews, code
 
         except Exception as e:

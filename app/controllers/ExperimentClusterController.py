@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from review_analysis.utils.elastic_connector import Connector
 from review_analysis.utils.morpho_tagger import MorphoTagger
-from review_analysis.clasification.fasttext_model import FastTextModel, EmbeddingType, ClusterMethod
+from review_analysis.clasification.fasttext_model import FastTextModel, EmbeddingType, ClusterMethod, EmbeddingModel
 from review_analysis.clasification.LDA_model import LDA_model
 
 # from app.utils.Exceptions import WrongProperty
@@ -45,14 +45,24 @@ class ExperimentClusterController:
         return sentences
 
     def __get_embedding_type(self, config: dict):
-        if config['embedding_method'] == 'sent2vec_dist':
+        if config['embedding_method'] == 'fse_dist':
             embedding_type = EmbeddingType.distance_matrix
-        elif config['embedding_method'] == 'sent2vec_sim':
+        elif config['embedding_method'] == 'fse_sim':
             embedding_type = EmbeddingType.similarity_matrix
-        elif config['embedding_method'] == 'sent2vec_vec':
+        elif config['embedding_method'] == 'fse_vec':
             embedding_type = EmbeddingType.sentence_vectors
         else:
             raise KeyError('embedding_method')
+
+        return embedding_type
+
+    def __get_embedding_model(self, config: dict):
+        if config['embedding_model'] == 'FastText_pretrained':
+            embedding_type = EmbeddingModel.fasttext_pretrained
+        elif config['embedding_model'] == 'FastText_300d':
+            embedding_type = EmbeddingModel.fasttext_300d
+        else:
+            raise KeyError('embedding_model')
 
         return embedding_type
 
@@ -66,14 +76,14 @@ class ExperimentClusterController:
 
     def __cluster(self, sentences: list, clusters_count: int, topics_per_cluster: int,
                   embedding_type: EmbeddingType, cluster_method: ClusterMethod,
-                  experiment_id: str, doSave: bool, sentence_type: str):
+                  experiment_id: str, embedding_model: EmbeddingModel, sentence_type: str):
         cluster = {
             'sentences_count': len(sentences),
             'clusters': [],
         }
 
         sentences_pos = [sentence['sentence_pos'] for sentence in sentences]
-        labels = self.fastTextModel.cluster_similarity(sentences_pos, pretrained=False, embedding=embedding_type,
+        labels = self.fastTextModel.cluster_similarity(sentences_pos, embedding_model, embedding=embedding_type,
                                                        cluster=cluster_method, cluster_cnt=clusters_count)
         #import math, random
         #labels = [math.floor(random.uniform(0, 7)) for _ in sentences_pos]
@@ -169,6 +179,7 @@ class ExperimentClusterController:
             "clusters_con": [],
             "cluster_method": config['cluster_method'],
             "embedding_method": config['embedding_method'],
+            "embedding_model": config['embedding_model'],
             "category": config['category'],
             "date": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
         }
@@ -214,7 +225,6 @@ class ExperimentClusterController:
             'type': cluster_d['type'],
             'cluster_name': 'cluster_' + str(cluster_d['cluster_number']),
             'cluster_number': cluster_d['cluster_number'],
-            # 'topics': cluster_d['topics'],
         }
 
         res = self.connector.index(index='experiment_cluster', doc=cluster)
@@ -240,7 +250,12 @@ class ExperimentClusterController:
 
             # 400 error
             if not data or ret_code != 200:
-                raise ValueError('This category does not have any experiments')
+                # check for category experiment in case of product
+                product = self.connector.get_product_by_name(content['category'])
+                if product:
+                    data, ret_code = self.connector.get_experiments_by_category(product['category'], content['category'])
+                else:
+                    raise ValueError('This category does not have any experiments')
 
             if len(data) > 1:
                 raise Exception('More experiments for category')
@@ -351,11 +366,11 @@ class ExperimentClusterController:
             return data, ret_code
 
         # except WrongProperty as e:
-        #    print('ExperimentController-cluster_similarity: {}'.format(str(e)), file=sys.stderr)
+        #    print('ExperimentController-peek_sentences: {}'.format(str(e)), file=sys.stderr)
         #    return {'error': str(e), 'error_code': 400}, 400
 
         except Exception as e:
-            print('ExperimentController-cluster_similarity: {}'.format(str(e)), file=sys.stderr)
+            print('ExperimentController-peek_sentences: {}'.format(str(e)), file=sys.stderr)
             return {'error': str(e), 'error_code': 500}, 500
 
     def cluster_similarity(self, config: dict):
@@ -364,30 +379,30 @@ class ExperimentClusterController:
         try:
             embedding_type = self.__get_embedding_type(config)
             cluster_method = self.__get_cluster_method(config)
+            embedding_model = self.__get_embedding_model(config)
+
             if not config['category']:
                 # raise WrongProperty('Empty category')
                 raise KeyError('category not found')
 
             d_existing, r_c = self.connector.get_experiments_by_category(config['category'])
-            if d_existing or r_c == 400:
+            if d_existing or r_c == 200:
                 raise KeyError('Experiment already exists')
 
             # create sentences pos cons
             sentences_pro, sentences_con = self.__get_reviews_sentences(config['category'])
 
-            experiment_id = '1'
-            if config['save_data']:
-                experiment_id = self.save_experiment(config)
-                if not experiment_id:
-                    raise Exception('Experiment was not saved')
+            experiment_id = self.save_experiment(config)
+            if not experiment_id:
+                raise Exception('Experiment was not saved')
 
             data['pos'], salient_pos = self.__cluster(sentences_pro, config['clusters_pos_count'],
                                                       config['topics_per_cluster'], embedding_type,
-                                                      cluster_method, experiment_id, config['save_data'],
+                                                      cluster_method, experiment_id, embedding_model,
                                                       'pos')
             data['con'], salient_con = self.__cluster(sentences_con, config['clusters_con_count'],
                                                       config['topics_per_cluster'], embedding_type,
-                                                      cluster_method, experiment_id, config['save_data'],
+                                                      cluster_method, experiment_id, embedding_model,
                                                       'con')
 
             res, ret_code = self.connector.update_experiment(
