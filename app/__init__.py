@@ -1,5 +1,6 @@
 from flask import Flask
 from flask_cors import CORS
+from flask_restx import Api
 import sys, secrets
 
 sys.path.append('../')
@@ -12,10 +13,17 @@ from .controllers.ExperimentClusterController import ExperimentClusterController
 from .controllers.ReviewExperimentController import ReviewController
 from .controllers.UserController import UserController
 
-app = Flask(__name__)
-CORS(app)
+flask_app = Flask(__name__)
+CORS(flask_app)
 
-app.config['SECRET_KEY'] = secrets.token_urlsafe(32)
+flask_app.config['SECRET_KEY'] = secrets.token_urlsafe(32)
+app = Api(app=flask_app,
+          version="1.0",
+          title="Review analysys back end",
+          description="Provides API interface to review analysis system.",
+          api_spec_url='/swagger',
+          contact='xkloco00@stud.fit.vutbr.cz'
+          )
 
 es_con = Connector()
 generate_cnt = GenerateDataController(es_con)
@@ -27,5 +35,4 @@ user_cnt = UserController(es_con)
 
 from app import routes
 
-if __name__ == '__main__':
-    app.run(debug=True, port=8081, host='0.0.0.0')
+

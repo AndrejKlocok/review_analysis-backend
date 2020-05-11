@@ -6,7 +6,15 @@ import sys
 
 
 class UserController(Controller):
-    def create_user(self, content):
+    """
+    Controller handles user authentication.
+    """
+    def create_user(self, content: dict):
+        """
+        Create new user, who's information are specified in content dictionary and index him to elasticsaerch.
+        :param content:
+        :return: user dict
+        """
         ret_code = 200
         try:
             if content['name'] and content['password'] and content['level']:
@@ -21,7 +29,12 @@ class UserController(Controller):
             print('ExperimentController-create_user: {}'.format(str(e)), file=sys.stderr)
             return {'error': str(e), 'error_code': 500}, 500
 
-    def get_user(self, name):
+    def get_user(self, name: str):
+        """
+        Get user by name.
+        :param name:
+        :return: user: User object
+        """
         try:
             user_d = self.connector.get_user_by_name(name)
             user = User(user_d['name'], user_d['level'], user_d['password_hash'])
@@ -29,9 +42,15 @@ class UserController(Controller):
 
             return user
         except Exception as e:
+            print('ExperimentController-get_user: {}'.format(str(e)), file=sys.stderr)
             return None
 
     def authenticate(self, **kwargs):
+        """
+        Authenticate user.
+        :param kwargs:
+        :return: user: User object
+        """
         name = kwargs.get('name')
         password = kwargs.get('password')
 

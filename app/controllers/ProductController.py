@@ -5,32 +5,51 @@ from review_analysis.utils.elastic_connector import Connector
 
 
 class ProductController:
+    """
+    Controller handles product/shop specific tasks and  exporting reviews from elastic.
+    """
     def __init__(self, con: Connector):
         self.connector = con
 
     def get_breadcrumbs(self):
+        """
+        Get simplified breadcrumbs path to product from main domains.
+        :return: Tree structure as dictionary, return code
+        """
         return self.connector.get_product_breadcrums()
 
-    def get_category_products(self, content: dict):
-        category = content['category_name']
-        if category == 'shop':
+    def get_category_products(self, name: str):
+        """
+        Get products of category or shops defined by name parameter.
+        :param name: subcategory or shop domain
+        :return:  dictionary with statistics and product/shop reviews, return code
+        """
+        if name == 'shop':
             return self.connector.get_shops()
         else:
-            return self.connector.get_category_products(category)
+            return self.connector.get_category_products(name)
 
     def get_product_reviews(self, content: dict):
+        """
+        Get reviews from shop or product specified by content dictionary.
+        :param content:
+        :return: list of reviews, return code
+        """
         try:
+            # get reviews
             if content['domain'] == 'shop':
                 reviews, code = self.connector.get_reviews_from_shop(content['name'], True)
             else:
                 reviews, code = self.connector.get_reviews_from_product(content['name'])
 
+            # check analysed reviews
             for review in reviews:
+                # compute rating diff
                 if 'rating_model' in review:
                     review['rating_diff'] = int(review['rating'][:-1]) - int(review['rating_model'][:-1])
                 else:
                     review['rating_diff'] = 0
-
+                # add filter model metadata
                 if 'filter_model' not in review:
                     review['filter_model'] = False
 
@@ -41,6 +60,11 @@ class ProductController:
             return {'error': str(e), 'error_code': 500}, 500
 
     def get_product_image_url(self, product_url: str):
+        """
+        Get products image url from products url on heureka site.
+        :param product_url:
+        :return: image url in dict, return code
+        """
         data = {}
         ret_code = 200
         try:
@@ -59,6 +83,11 @@ class ProductController:
             return data, ret_code
 
     def get_statistics(self, content: dict):
+        """
+        Compute products/shop statistics as AVG rating/recommends, review count graph in time
+        :param content:
+        :return: dict of statistics, return code
+        """
         try:
             data = {}
             ret_code = 200

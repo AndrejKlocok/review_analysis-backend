@@ -7,12 +7,13 @@ from review_analysis.utils.morpho_tagger import MorphoTagger
 from review_analysis.clasification.fasttext_model import FastTextModel, EmbeddingType, ClusterMethod, EmbeddingModel
 from review_analysis.clasification.LDA_model import LDA_model
 
-# from app.utils.Exceptions import WrongProperty
-
 warnings.filterwarnings("ignore", module="matplotlib")
 
 
 class ExperimentClusterController:
+    """
+    Controller class handles clustering related task, provides CRUD API for clusters, topics, sentences.
+    """
     def __init__(self, con: Connector):
         self.connector = con
         self.tagger = MorphoTagger()
@@ -20,6 +21,12 @@ class ExperimentClusterController:
         self.fastTextModel = FastTextModel()
 
     def __get_sentences(self, rev: dict, sen_type: str):
+        """
+        Perform pos tagging on sentence list from review rev, specified by type of polarity sen_type.
+        :param rev: review dictionary
+        :param sen_type: type of sentences of review pros/cons
+        :return: list of sentences dictionary: List[Dict[str, Union[list, int, str]]]
+        """
         sentences = []
         for index, sentence in enumerate(rev[sen_type]):
             sentence_pos = self.tagger.pos_tagging(sentence, False)
@@ -45,6 +52,11 @@ class ExperimentClusterController:
         return sentences
 
     def __get_embedding_type(self, config: dict):
+        """
+        Convert embedding type string representation in config dict to enum value.
+        :param config: configuration dict
+        :return: enum: EmbeddingType
+        """
         if config['embedding_method'] == 'fse_dist':
             embedding_type = EmbeddingType.distance_matrix
         elif config['embedding_method'] == 'fse_sim':
@@ -57,6 +69,11 @@ class ExperimentClusterController:
         return embedding_type
 
     def __get_embedding_model(self, config: dict):
+        """
+        Convert embedding model string representation in config dict to enum value.
+        :param config: configuration dict
+        :return: enum:  EmbeddingModel
+        """
         if config['embedding_model'] == 'FastText_pretrained':
             embedding_type = EmbeddingModel.fasttext_pretrained
         elif config['embedding_model'] == 'FastText_300d':
@@ -67,6 +84,11 @@ class ExperimentClusterController:
         return embedding_type
 
     def __get_cluster_method(self, config: dict):
+        """
+        Convert clustering method string representation in config dict to enum value.
+        :param config: configuration dict
+        :return: enum: ClusterMethod
+        """
         if config['cluster_method'] == 'kmeans':
             cluster = ClusterMethod.kmeans
         else:
@@ -77,18 +99,33 @@ class ExperimentClusterController:
     def __cluster(self, sentences: list, clusters_count: int, topics_per_cluster: int,
                   embedding_type: EmbeddingType, cluster_method: ClusterMethod,
                   experiment_id: str, embedding_model: EmbeddingModel, sentence_type: str):
+        """
+        Perform clustering of sentences with given arguments.
+        :param sentences: list of lemma sentences
+        :param clusters_count: count of clusters
+        :param topics_per_cluster: count of topics per cluster
+        :param embedding_type:  type of embedding for sentences (text)
+        :param cluster_method: type of clustering method
+        :param experiment_id: ID of experiment
+        :param embedding_model: type of embedding model, from which embedding will be generated
+        :param sentence_type: type of sentences pos/con
+        :return: touple of dictionary which represents list of clusters and salient words:
+        Tuple[Dict[str, Union[int, list]], list]
+        """
         cluster = {
             'sentences_count': len(sentences),
             'clusters': [],
         }
-
+        # assign lemmas of sentence to each sentence
         sentences_pos = [sentence['sentence_pos'] for sentence in sentences]
+        # perform clustering
         labels = self.fastTextModel.cluster_similarity(sentences_pos, embedding_model, embedding=embedding_type,
                                                        cluster=cluster_method, cluster_cnt=clusters_count)
         #import math, random
         #labels = [math.floor(random.uniform(0, 7)) for _ in sentences_pos]
         cnt = Counter(labels)
 
+        # init clusters representation with meta data
         clusters = {}
         label_to_cluster_id = {}
         for key, value in cnt.items():
@@ -108,6 +145,7 @@ class ExperimentClusterController:
             clusters[key] = cluster_meta
             label_to_cluster_id[key] = cluster_id
 
+        # assign experiment data to each sentence
         for index, label in enumerate(labels):
             sentences[index]['cluster_number'] = label_to_cluster_id[label]
             sentences[index]['topic_number'] = 0
@@ -115,9 +153,11 @@ class ExperimentClusterController:
             sentences[index]['experiment_id'] = experiment_id
             clusters[label]['sentences'].append(sentences[index])
 
+        # perform inner cluster information retrieval with LDA, get topics per cluster and salient words
         lda = LDA_model(topics_per_cluster)
         salient_words = lda.load_sentences_from_api(clusters, self.tagger)
 
+        # assign topic information to each sentence
         for _, value in clusters.items():
             topic_to_id = {}
             cluster['clusters'].append(value)
@@ -130,6 +170,7 @@ class ExperimentClusterController:
                 for topic in value['topics']:
                     topic = topic + '_' + str(i)
 
+            # index topic
             for index, topic in enumerate(value['topics']):
                 d = {
                     "experiment_id": experiment_id,
@@ -142,6 +183,7 @@ class ExperimentClusterController:
                     raise Exception('Did not saved: {}'.format(str(d)))
                 topic_to_id[index] = topic_id
 
+            # update sentence meta data
             for sentence in value['sentences']:
                 sentence['topic_id'] = topic_to_id[sentence['topic_number']]
                 if not self.save_sentence(sentence):
@@ -153,6 +195,11 @@ class ExperimentClusterController:
         return cluster, salient_words
 
     def __get_reviews_sentences(self, category):
+        """
+        Get positive and negative sentences from domain category or product/shop.
+        :param category: name of product/shop/category
+        :return: touple of sentences: Tuple[list, list]
+        """
         sentences_pro = []
         sentences_con = []
 
@@ -162,9 +209,6 @@ class ExperimentClusterController:
         if ret == 404:
             reviews, ret = self.connector.get_reviews_from_product(category)
 
-        # if ret != 200:
-        #    raise WrongProperty('No reviews found for category: {}'.format(cat))
-
         # create sentences pos cons
         for review in reviews:
             sentences_pro += self.__get_sentences(review, 'pros')
@@ -173,6 +217,11 @@ class ExperimentClusterController:
         return sentences_pro, sentences_con
 
     def save_experiment(self, config: dict):
+        """
+        Index experiment into elasticsearch.
+        :param config: experiment as dict
+        :return: id of experiment: Optional[Any]
+        """
         experiment = {
             "topics_per_cluster": config['topics_per_cluster'],
             "clusters_pos": [],
@@ -189,6 +238,11 @@ class ExperimentClusterController:
         return None
 
     def save_sentence(self, sentence: dict):
+        """
+        Index sentence into elasticsearch.
+        :param sentence: sentence as dict
+        :return: id of sentence: Optional[Any]
+        """
         experiment_sentence = {
             "review_id": sentence['review_id'],
             "experiment_id": sentence['experiment_id'],
@@ -208,6 +262,11 @@ class ExperimentClusterController:
         return False
 
     def save_topic(self, topic_d: dict):
+        """
+        Index sentence into elasticsearch.
+        :param topic_d: topic as dict
+        :return: id of topic: Optional[Any]
+        """
         experiment_topic = {
             "experiment_id": topic_d['experiment_id'],
             "cluster_number": topic_d['cluster_number'],
@@ -220,6 +279,11 @@ class ExperimentClusterController:
         return None
 
     def save_cluster_meta(self, cluster_d: dict):
+        """
+        Index cluster into elasticsearch.
+        :param cluster_d: cluster as dict
+        :return: id of cluster: Optional[Any]
+        """
         cluster = {
             'experiment_id': cluster_d['experiment_id'],
             'type': cluster_d['type'],
@@ -234,6 +298,11 @@ class ExperimentClusterController:
         return None
 
     def get_experiment(self):
+        """
+        Get All experiments.
+        :return: Union[Tuple[Any, Any], Tuple[Dict[str, Union[str, int]], int]]
+
+        """
         try:
             data, ret_code = self.connector.get_experiments()
 
@@ -243,7 +312,12 @@ class ExperimentClusterController:
             print('ExperimentController-get_experiment: {}'.format(str(e)), file=sys.stderr)
             return {'error': str(e), 'error_code': 500}, 500
 
-    def get_experiment_sentences(self, content):
+    def get_experiment_sentences(self, content: dict):
+        """
+        Get clustering  data for given category/shop/product.
+        :param content: dictionary with category/shop/product name
+        :return: experiment data: Union[Tuple[Dict[str, Dict[str, Any]], Any], Tuple[Dict[str, Union[str, int]], int]]
+        """
         try:
             # if content['experiment_id']:
             data, ret_code = self.connector.get_experiments_by_category(content['category'])
@@ -290,7 +364,12 @@ class ExperimentClusterController:
             print('ExperimentController-get_experiment_sentences: {}'.format(str(e)), file=sys.stderr)
             return {'error': str(e), 'error_code': 500}, 500
 
-    def delete_experiment(self, content):
+    def delete_experiment(self, content: dict):
+        """
+        Remove experiment data, its clusters, topics and sentences from elasticsearch.
+        :param content:
+        :return: experiment list: Union[Tuple[Any, Any], Tuple[Dict[str, str], Any], Tuple[Dict[str, Union[str, int]], int]]
+        """
         try:
             data, ret_code = self.connector.delete_experiment(content['experiment_id'])
 
@@ -308,7 +387,12 @@ class ExperimentClusterController:
             print('ExperimentController-delete_experiment: {}'.format(str(e)), file=sys.stderr)
             return {'error': str(e), 'error_code': 500}, 500
 
-    def update_experiment_cluster_name(self, content):
+    def update_experiment_cluster_name(self, content: dict):
+        """
+        Update experiments cluster name in elasticsearch.
+        :param content:
+        :return: elastic update dictionary
+        """
         try:
 
             data, ret_code = self.connector.update_experiment_cluster_name(
@@ -327,7 +411,12 @@ class ExperimentClusterController:
             print('ExperimentController-update_experiment_cluster_name: {}'.format(str(e)), file=sys.stderr)
             return {'error': str(e), 'error_code': 500}, 500
 
-    def update_topic_name(self, content):
+    def update_topic_name(self, content: dict):
+        """
+        Update the name of the topic.
+        :param content:
+        :return:
+        """
         try:
 
             data, ret_code = self.connector.update_experiment_cluster_topic(
@@ -347,6 +436,11 @@ class ExperimentClusterController:
             return {'error': str(e), 'error_code': 500}, 500
 
     def peek_sentences(self, config: dict):
+        """
+        Get informations about the count of pos/con sentences for clustering experiment.
+        :param config:
+        :return: sentences_count dictionary, return code
+        """
         data = {}
         ret_code = 200
         try:
@@ -365,15 +459,16 @@ class ExperimentClusterController:
 
             return data, ret_code
 
-        # except WrongProperty as e:
-        #    print('ExperimentController-peek_sentences: {}'.format(str(e)), file=sys.stderr)
-        #    return {'error': str(e), 'error_code': 400}, 400
-
         except Exception as e:
             print('ExperimentController-peek_sentences: {}'.format(str(e)), file=sys.stderr)
             return {'error': str(e), 'error_code': 500}, 500
 
     def cluster_similarity(self, config: dict):
+        """
+        Perform text clustering according to configuration in config dictionary.
+        :param config:
+        :return: clustering data dictionary, return code
+        """
         start = time.time()
         data = {}
         try:
@@ -414,10 +509,6 @@ class ExperimentClusterController:
             print(time.time() - start)
             return data, ret_code
 
-        # except WrongProperty as e:
-        #    print('ExperimentController-cluster_similarity: {}'.format(str(e)), file=sys.stderr)
-        #    return {'error': str(e), 'error_code': 400}, 400
-
         except KeyError as e:
             print('ExperimentController-cluster_similarity: {}'.format(str(e)), file=sys.stderr)
             return {'error': str(e), 'error_code': 400}, 400
@@ -427,6 +518,11 @@ class ExperimentClusterController:
             return {'error': str(e), 'error_code': 500}, 500
 
     def cluster_merge(self, config: dict):
+        """
+        Merge experiment cluster with its topics and sentences to another cluster.
+        :param config:
+        :return:
+        """
         try:
             data, ret_code = self.connector.merge_experiment_cluster(config['cluster_from'], config['cluster_to'])
             return data, ret_code
@@ -436,6 +532,11 @@ class ExperimentClusterController:
             return {'error': str(e), 'error_code': 500}, 500
 
     def update_sentence(self, config: dict):
+        """
+        Transfer sentence into another cluster or topic according to config dictionary.
+        :param config:
+        :return:
+        """
         try:
             data, ret_code = self.connector.update_experiment_cluster_sentence(
                 config['cluster_id'], config['sentence_id'],
@@ -447,6 +548,11 @@ class ExperimentClusterController:
             return {'error': str(e), 'error_code': 500}, 500
 
     def create_cluster(self, config: dict):
+        """
+        Create empty cluster in experiment according to config dictionary.
+        :param config:
+        :return: dictionary with id of cluster, return code
+        """
         try:
             cluster = {
                 'experiment_id': config['experiment_id'],
@@ -477,6 +583,11 @@ class ExperimentClusterController:
             return {'error': str(e), 'error_code': 500}, 500
 
     def append_topics(self, config: dict):
+        """
+        Append new topic to cluster according to config dictionary.
+        :param config:
+        :return: dictionary with topic id, return code.
+        """
         try:
             for index, topic in enumerate(config['topics']):
                 d = {
@@ -497,6 +608,12 @@ class ExperimentClusterController:
             return {'error': str(e), 'error_code': 500}, 500
 
     def merge_topic(self, config: dict):
+        """
+        Merge topic identified by topic_from_id and its sentences to cluster identified by cluster_to_id and topic topic_to_id.
+        :param config:
+        :return:
+        """
+
         try:
             data, ret_code = self.connector.update_experiment_cluster_sentences(
                 config['topic_from_id'],

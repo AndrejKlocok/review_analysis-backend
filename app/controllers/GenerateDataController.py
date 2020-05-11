@@ -7,17 +7,28 @@ from review_analysis.utils.generate_dataset import GeneratorController
 
 
 class GenerateDataController:
+    """
+    Controller handles exporting data in generating tasks.
+    """
     def __init__(self, con: Connector):
         self.connector = con
         self.generator = GeneratorController(con)
 
     def generate_dataset(self, content: dict):
+        """
+        Export data according to content dictionary values.
+        :param content:
+        :return:
+        """
         try:
+            # perform generating task
             data = self.generator.generate(content)
 
+            # if it is an error return concrete err
             if 'error' in data:
                 return data, 400
             else:
+                # else return zip file
                 data_file = io.BytesIO()
                 with zipfile.ZipFile(data_file, mode='w') as z:
                     for key, value in data.items():
