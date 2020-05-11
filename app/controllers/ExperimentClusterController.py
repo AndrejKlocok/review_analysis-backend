@@ -17,7 +17,7 @@ class ExperimentClusterController:
     def __init__(self, con: Connector):
         self.connector = con
         self.tagger = MorphoTagger()
-        self.tagger.load_tagger()
+        self.tagger.load_tagger(path='../review_analysis/external/morphodita/czech-morfflex-pdt-161115-no_dia-pos_only.tagger')
         self.fastTextModel = FastTextModel()
 
     def __get_sentences(self, rev: dict, sen_type: str):
