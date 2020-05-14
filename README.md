@@ -10,7 +10,7 @@ API needs at least 50GB of RAM memory to be able to load all models.
 ## Execution
 Before execution the flask command needs to be configured with these commands:
 
-        export FLASK_APP=run.py 
+        export FLASK_APP=app.py 
         export FLASK_ENV=production
 
 Start backend server with command (on pcknot5 server):

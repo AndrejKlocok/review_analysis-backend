@@ -20,9 +20,9 @@ class ReviewController:
 
         self.re_int = re.compile(r'^[-+]?([1-9]\d*|0)$')
         self.tagger = MorphoTagger()
-        self.tagger.load_tagger(path='../review_analysis/external/morphodita/czech-morfflex-pdt-161115-no_dia-pos_only.tagger')
+        self.tagger.load_tagger(path='../model/czech-morfflex-pdt-161115-no_dia-pos_only.tagger')
         self.pos_con_labels = ['0', '1']
-        self.irrelevant_model = SVM_Classifier()
+        self.irrelevant_model = SVM_Classifier('../model/')
         # self.irrelevant_model.load_models()
         self.pos_con_model = Bert_model(path + 'bert_bipolar',
                                         self.pos_con_labels)
