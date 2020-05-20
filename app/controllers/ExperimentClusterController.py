@@ -1,3 +1,11 @@
+"""
+This file contains implementation of ExperimentClusterController class, which provides handles to /experiment endpoints.
+Class provides methods to perform similarity clustering experiment as well as it provides CRUD api for experiments,
+clusters, topics and sentences.
+
+Author: xkloco00@stud.fit.vutbr.cz
+"""
+
 import sys, time, warnings
 from collections import Counter
 from datetime import datetime, timezone
@@ -13,8 +21,13 @@ warnings.filterwarnings("ignore", module="matplotlib")
 class ExperimentClusterController:
     """
     Controller class handles clustering related task, provides CRUD API for clusters, topics, sentences.
+    Handles clustering similarity experiment.
     """
     def __init__(self, con: Connector):
+        """
+        Constructor method takes elastic connector instance, initialise morphological tagger and loads FastText model.
+        :param con: instance of elastic connector
+        """
         self.connector = con
         self.tagger = MorphoTagger()
         self.tagger.load_tagger(path='../model/czech-morfflex-pdt-161115-no_dia-pos_only.tagger')

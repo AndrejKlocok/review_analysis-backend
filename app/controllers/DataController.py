@@ -1,3 +1,10 @@
+"""
+This file contains implementation of DataController class, which provides handles to /data endpoints. It is used for
+retrieval of non critical data by API requests.
+
+Author: xkloco00@stud.fit.vutbr.cz
+"""
+
 import datetime
 import sys
 

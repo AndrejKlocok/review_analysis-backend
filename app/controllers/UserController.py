@@ -1,4 +1,11 @@
-from werkzeug.security import generate_password_hash, check_password_hash
+"""
+This file contains implementation of UserController class, which provides /login and /register endpoints. Class handles
+user authentication and registration.
+
+Author: xkloco00@stud.fit.vutbr.cz
+"""
+
+from werkzeug.security import check_password_hash
 
 from .Controller import Controller
 from app.models import User

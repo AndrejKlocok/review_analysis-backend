@@ -1,3 +1,13 @@
+"""
+This file contains implementation of ReviewController class, which handles few /experiment/ endpoints:
+    /experiment/review
+    /experiment/sentence_pos_con
+    /experiment/text_rating
+    /experiment/text_irrelevant
+This class uses trained models to perform analysis right on the requests.
+
+Author: xkloco00@stud.fit.vutbr.cz
+"""
 from review_analysis.utils.elastic_connector import Connector
 import warnings, sys, re
 from nltk.tokenize import sent_tokenize
@@ -11,10 +21,17 @@ from review_analysis.utils.morpho_tagger import MorphoTagger
 
 class ReviewController:
     """
-    Controller handles text/review analysis with all available models.
+    Controller handles text/review analysis. Provides handlers for review analysis with bipolar bert models, prediction
+    of reviews rating and marking of salient words within sentence. Also single methods for bipolar analysis, irrelevant
+    review analysis and text rating.
     """
 
     def __init__(self, con: Connector):
+        """
+        Constructor method takes elastic connector instance. Initializes morphological tagger and domain bipolar bert
+        models, text rating prediction model, irrelevant model.
+        :param con: instance of elastic connector
+        """
         self.connector = con
         path = '../model/'
 
@@ -23,7 +40,7 @@ class ReviewController:
         self.tagger.load_tagger(path='../model/czech-morfflex-pdt-161115-no_dia-pos_only.tagger')
         self.pos_con_labels = ['0', '1']
         self.irrelevant_model = SVM_Classifier('../model/')
-        # self.irrelevant_model.load_models()
+        self.irrelevant_model.load_models()
         self.pos_con_model = Bert_model(path + 'bert_bipolar',
                                         self.pos_con_labels)
         self.pos_con_model.do_eval()
@@ -58,9 +75,9 @@ class ReviewController:
             'stavebniny',
             'sexualni_a_eroticke_pomucky',
         ]
-        # for value in indexes:
-        #    d[value] = Bert_model(path + 'bert_bipolar_domain/' + value, labels)
-        #    d[value].do_eval()
+        for value in indexes:
+            d[value] = Bert_model(path + 'bert_bipolar_domain/' + value, labels)
+            d[value].do_eval()
 
         return d
 

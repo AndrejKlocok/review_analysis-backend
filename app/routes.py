@@ -1,10 +1,16 @@
+"""
+This file contains direct implementation of routing of application. This consists of API route namespaces, input models,
+token_required wrapper function and implementation of endpoint handlers.
+
+Author: xkloco00@stud.fit.vutbr.cz
+"""
+
 from app import app, product_cnt, generate_cnt, data_cnt, experiment_cluster_cnt, review_cnt, user_cnt
 from flask import request, send_file, current_app
-from flask_restx import Resource, fields, marshal, marshal_with
+from flask_restx import Resource, fields
 import jwt
 from datetime import datetime, timedelta
 from functools import wraps
-from .models import User
 
 # name spaces
 data_ns = app.namespace('data', description='Handles non essential data')
@@ -14,6 +20,7 @@ experiment_ns = app.namespace('experiment', description='Clustering of similar s
 login_ns = app.namespace('login', description='User authentication')
 register_ns = app.namespace('register', description='User authentication')
 
+# input models
 actualization_statistic_model = app.model('actualization_statistic_model',
                                           {
                                               'category': fields.String(required=True,
@@ -417,7 +424,6 @@ class ExperimentTextRating(Resource):
         return data, ret_code
 
 
-# @app.route('/experiment/text_irrelevant', methods=['POST'])
 @experiment_ns.route('/text_irrelevant')
 class ExperimentTextIrrelevant(Resource):
     @app.expect(experiment_demo_model)

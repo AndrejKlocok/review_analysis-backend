@@ -1,3 +1,9 @@
+"""
+This file contains implementation of User class
+
+Author: xkloco00@stud.fit.vutbr.cz
+"""
+
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from flask_login import UserMixin

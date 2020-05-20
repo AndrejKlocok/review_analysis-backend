@@ -1,15 +1,20 @@
+"""
+This file contains implementation of ProductController class, which handles /product/ endpoints. This class
+provides API for dataset exporting with selectable formats.
+
+Author: xkloco00@stud.fit.vutbr.cz
+"""
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
 import sys
-from review_analysis.utils.elastic_connector import Connector
+from .Controller import Controller
 
 
-class ProductController:
+class ProductController(Controller):
     """
-    Controller handles product/shop specific tasks and  exporting reviews from elastic.
+    Controller handles product/shop specific tasks and  exporting reviews from elastic, retrieving metadata of products
+    like its image on heureka page and simple statistics.
     """
-    def __init__(self, con: Connector):
-        self.connector = con
 
     def get_breadcrumbs(self):
         """

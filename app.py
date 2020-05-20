@@ -1,4 +1,9 @@
 #!/usr/bin/python3
+"""
+This file is used for execution of back end server.
+
+Author: xkloco00@stud.fit.vutbr.cz
+"""
 from app import app
 
 if __name__ == '__main__':

@@ -1,3 +1,9 @@
+"""
+This file contains implementation of GenerateDataController class, which handles /generate/ endpoints. This class
+provides API for dataset exporting with selectable formats.
+
+Author: xkloco00@stud.fit.vutbr.cz
+"""
 import zipfile
 import io
 import sys
@@ -11,6 +17,10 @@ class GenerateDataController:
     Controller handles exporting data in generating tasks.
     """
     def __init__(self, con: Connector):
+        """
+        Constructor method takes elastic connector instance and creates instance of GeneratorController.
+        :param con: instance of elastic connector
+        """
         self.connector = con
         self.generator = GeneratorController(con)
 
