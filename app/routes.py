@@ -226,7 +226,7 @@ def token_required(f):
         token = None
 
         invalid_msg = {
-            'error': 'Invalid token. Registration and / or authentication required',
+            'error': 'Invalid token. Registration or authentication required',
             'authenticated': False,
             'error_code': 401
         }
