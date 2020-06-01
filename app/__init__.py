@@ -25,8 +25,9 @@ CORS(flask_app)
 flask_app.config['SECRET_KEY'] = secrets.token_urlsafe(32)
 app = Api(app=flask_app,
           version="1.0",
-          title="Review analysys back end",
-          description="Provides API interface to review analysis system.",
+          title="Review analysis project - back-end application.",
+          description="This Flask application provides API interface to review analysis systems, mainly front end"
+                      " server.",
           api_spec_url='/swagger',
           contact='xkloco00@stud.fit.vutbr.cz'
           )
